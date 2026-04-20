@@ -15,6 +15,9 @@ class AuthService
             'password' => Hash::make($data['password']),
         ]);
 
+        // ✅ Assignation du rôle par défaut
+        $user->assignRole('agent');
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return compact('user', 'token');

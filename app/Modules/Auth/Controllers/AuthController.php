@@ -13,6 +13,9 @@ class AuthController extends Controller
 {
     public function __construct(private AuthService $service) {}
 
+    /**
+     * Register a new user
+     */
     public function register(RegisterRequest $request)
     {
         $result = $this->service->register($request->validated());
@@ -26,6 +29,9 @@ class AuthController extends Controller
         ], 201);
     }
 
+    /**
+     * Login user
+     */
     public function login(LoginRequest $request)
     {
         $result = $this->service->login($request->validated());
@@ -49,9 +55,25 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Logout user
+     */
     public function logout(Request $request)
     {
-        $this->service->logout($request->user());
+        $user = $request->user();
+
+        // Protection contre null → évite erreur 500
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'message' => 'Non authentifié',
+                'errors' => ['auth' => 'Unauthorized'],
+                'meta' => []
+            ], 401);
+        }
+
+        $this->service->logout($user);
 
         return response()->json([
             'success' => true,
@@ -62,20 +84,37 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Get authenticated user
+     */
     public function me(Request $request)
     {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'message' => 'Non authentifié',
+                'errors' => ['auth' => 'Unauthorized'],
+                'meta' => []
+            ], 401);
+        }
+
         return response()->json([
             'success' => true,
-            'data' => $request->user(),
+            'data' => $user,
             'message' => 'Utilisateur connecté',
             'errors' => null,
             'meta' => []
         ]);
     }
 
+    /**
+     * Reset password (MVP simplifié)
+     */
     public function resetPassword(ResetPasswordRequest $request)
     {
-        // Simplifié (MVP)
         return response()->json([
             'success' => true,
             'data' => null,
