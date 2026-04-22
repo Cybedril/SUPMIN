@@ -4,6 +4,7 @@ namespace App\Modules\Auth\Services;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 class AuthService
 {
@@ -16,6 +17,7 @@ class AuthService
         ]);
 
         // ✅ Assignation du rôle par défaut
+        Role::firstOrCreate(['name' => 'agent']);
         $user->assignRole('agent');
 
         $token = $user->createToken('auth_token')->plainTextToken;

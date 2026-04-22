@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('recommendation_trackings', function (Blueprint $table) {
         $table->uuid('id')->primary();
         $table->foreignUuid('recommendation_id')->constrained()->cascadeOnDelete();
-        $table->foreignUuid('user_id')->nullable()->constrained()->nullOnDelete();
+        $table->foreignId('user_id')->constrained()->cascadeOnDelete();
         $table->string('status');
         $table->text('comment')->nullable();
         $table->timestamps();

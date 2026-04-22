@@ -6,24 +6,35 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('responses', function (Blueprint $table) {
-        $table->uuid('id')->primary();
-        $table->foreignUuid('mission_id')->constrained()->cascadeOnDelete();
-        $table->foreignUuid('question_id')->constrained()->cascadeOnDelete();
-        $table->foreignUuid('user_id')->constrained()->cascadeOnDelete();
-        $table->text('answer')->nullable();
-        $table->timestamps();
+    $table->uuid('id')->primary();
+
+    // UUID OK
+    $table->uuid('mission_id');
+    $table->uuid('question_id');
+
+    // ✅ CORRECTION ICI (BIGINT)
+    $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+
+    // FK UUID manuelles
+    $table->foreign('mission_id')
+        ->references('id')
+        ->on('missions')
+        ->cascadeOnDelete();
+
+    $table->foreign('question_id')
+        ->references('id')
+        ->on('questions')
+        ->cascadeOnDelete();
+
+    $table->text('answer')->nullable();
+
+    $table->timestamps();
 });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('responses');
