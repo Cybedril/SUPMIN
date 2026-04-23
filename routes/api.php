@@ -6,21 +6,25 @@ use App\Modules\Mission\Controllers\MissionController;
 
 Route::prefix('v1')->group(function () {
 
+    // Auth
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 
     Route::middleware('auth:sanctum')->group(function () {
+
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
-        Route::apiResource('entities', EntityController::class);
 
+        // Entities
         Route::get('/entities', [EntityController::class, 'index']);
-    Route::post('/entities', [EntityController::class, 'store']);
+        Route::post('/entities', [EntityController::class, 'store'])
+            ->middleware('role:admin');
 
-    Route::get('/missions', [MissionController::class, 'index']);
-    Route::post('/missions', [MissionController::class, 'store']);
-
+        // Missions
+        Route::get('/missions', [MissionController::class, 'index']);
+        Route::post('/missions', [MissionController::class, 'store'])
+            ->middleware('role:admin|superviseur');
     });
 
 });
