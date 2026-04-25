@@ -15,9 +15,10 @@ class Form extends Model
         'description',
     ];
 
+     // 🔗 Form → Sections
     public function sections()
     {
-        return $this->hasMany(Section::class);
+        return $this->hasMany(Section::class)->orderBy('order');
     }
 
     public function missions()

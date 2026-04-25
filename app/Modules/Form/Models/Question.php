@@ -23,6 +23,7 @@ class Question extends Model
         'is_required' => 'boolean',
     ];
 
+     // 🔗 Question → Section
     public function section()
     {
         return $this->belongsTo(Section::class);

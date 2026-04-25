@@ -11,15 +11,26 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('questions', function (Blueprint $table) {
-        $table->uuid('id')->primary();
-        $table->foreignUuid('section_id')->constrained()->cascadeOnDelete();
-        $table->string('label');
-        $table->string('type');
-        $table->json('options')->nullable();
-        $table->boolean('is_required')->default(false);
-        $table->integer('order')->default(0);
-        $table->timestamps();
+       Schema::create('questions', function (Blueprint $table) {
+    $table->uuid('id')->primary();
+
+    $table->uuid('section_id');
+
+    $table->string('label');
+    $table->string('type'); // text, number, select, checkbox, image, date
+
+    $table->boolean('required')->default(false);
+
+    $table->json('options')->nullable(); // pour select, checkbox
+
+    $table->integer('order')->default(0);
+
+    $table->timestamps();
+
+    $table->foreign('section_id')
+        ->references('id')
+        ->on('sections')
+        ->cascadeOnDelete();
 });
     }
 

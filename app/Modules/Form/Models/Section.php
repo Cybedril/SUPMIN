@@ -16,13 +16,15 @@ class Section extends Model
         'order',
     ];
 
+     // 🔗 Section → Form
     public function form()
     {
         return $this->belongsTo(Form::class);
     }
 
+    // 🔗 Section → Questions
     public function questions()
     {
-        return $this->hasMany(Question::class);
+        return $this->hasMany(Question::class)->orderBy('order');
     }
 }
