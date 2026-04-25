@@ -46,4 +46,13 @@ class Mission extends Model
     {
         return $this->hasMany(\App\Modules\Recommendation\Models\Recommendation::class);
     }
+    public function agents()
+{
+    return $this->belongsToMany(\App\Models\User::class)
+        ->withPivot('role');
+}
+public function leader()
+{
+    return $this->agents()->wherePivot('role', 'leader')->first();
+}
 }

@@ -16,8 +16,15 @@ class User extends Authenticatable
         'email',
         'password',
     ];
+
     protected $hidden = [
     'password',
     'remember_token',
     ];
+    public function missions()
+{
+    return $this->belongsToMany(
+        \App\Modules\Mission\Models\Mission::class
+    )->withPivot('role');
+}
 }
