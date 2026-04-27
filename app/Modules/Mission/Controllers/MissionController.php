@@ -57,4 +57,26 @@ class MissionController extends Controller
             'errors' => null
         ]);
     }
+
+   // 🔹 GET /missions/{id}/pdf 
+   public function pdf(Mission $mission)
+{
+    if (!$mission->pdf_path) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Aucun PDF disponible'
+        ], 404);
+    }
+
+    $url = asset('storage/' . $mission->pdf_path);
+
+    return response()->json([
+        'success' => true,
+        'data' => [
+            'url' => $url
+        ],
+        'message' => 'PDF disponible',
+        'errors' => null
+    ]);
+}
 }

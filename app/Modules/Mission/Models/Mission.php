@@ -5,6 +5,7 @@ namespace App\Modules\Mission\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Modules\Shared\Traits\HasUuid;
 
+
 class Mission extends Model
 {
     use HasUuid;
@@ -54,5 +55,9 @@ class Mission extends Model
 public function leader()
 {
     return $this->agents()->wherePivot('role', 'leader')->first();
+}
+public function answers()
+{
+    return $this->hasMany(\App\Modules\Form\Models\Answer::class);
 }
 }

@@ -23,7 +23,7 @@ class Question extends Model
         'is_required' => 'boolean',
     ];
 
-     // 🔗 Question → Section
+     //  Question → Section
     public function section()
     {
         return $this->belongsTo(Section::class);
@@ -32,5 +32,9 @@ class Question extends Model
     public function responses()
     {
         return $this->hasMany(\App\Modules\Response\Models\Response::class);
+    }
+    public function answers()
+    {
+    return $this->hasMany(\App\Modules\Form\Models\Answer::class);
     }
 }
