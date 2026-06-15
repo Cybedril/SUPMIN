@@ -33,28 +33,30 @@ class DashboardController extends Controller
             ->keyBy('statut');
 
         // Recommandations critiques en retard
+        // FIX : utiliser les vrais noms de statuts (sans accent, cohérent avec le reste du code)
         $critiquesEnRetard = Recommendation::where('priorite', 'critique')
-            ->whereNotIn('statut', ['clôturée', 'non_mise_en_oeuvre'])
+            ->whereNotIn('statut', ['cloturee', 'non_mise_en_oeuvre'])
             ->where('delai_realisation', '<', now())
             ->count();
 
         // Taux de conformité global
         $totalRecs = Recommendation::count();
-        $closedRecs = Recommendation::where('statut', 'clôturée')->count();
+        $closedRecs = Recommendation::where('statut', 'cloturee')->count();
         $tauxConformite = $totalRecs > 0 ? round(($closedRecs / $totalRecs) * 100) : 0;
 
+        // FIX : utiliser les vrais noms de statuts en base
         $data = [
             'missions' => [
-                'total'     => Mission::count(),
-                'en_cours'  => $missions->get('en_cours')?->total ?? 0,
-                'planifiées'=> $missions->get('planifiée')?->total ?? 0,
-                'clôturées' => $missions->get('clôturée')?->total ?? 0,
+                'total'      => Mission::count(),
+                'en_cours'   => $missions->get('en_cours')?->total ?? 0,
+                'planifiées' => $missions->get('planifiee')?->total ?? 0,
+                'clôturées'  => $missions->get('cloturee')?->total ?? 0,
             ],
             'recommandations' => [
-                'total'              => $totalRecs,
-                'en_cours'           => $recommendations->get('en_cours')?->total ?? 0,
-                'clôturées'          => $closedRecs,
-                'critiques_en_retard'=> $critiquesEnRetard,
+                'total'               => $totalRecs,
+                'en_cours'            => $recommendations->get('en_cours')?->total ?? 0,
+                'clôturées'           => $closedRecs,
+                'critiques_en_retard' => $critiquesEnRetard,
             ],
             'taux_conformite' => $tauxConformite,
             'entites'         => Entity::count(),

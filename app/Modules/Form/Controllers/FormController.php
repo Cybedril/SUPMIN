@@ -33,6 +33,27 @@ class FormController extends Controller
     }
 
     /**
+     * Synchronise la table pivot mission_forms avec le mission_id du formulaire.
+     * À appeler après création ou mise à jour d'un formulaire avec un mission_id.
+     */
+    private function syncMissionForm(Form $form): void
+    {
+        // Supprimer les anciennes liaisons de ce formulaire
+        DB::table('mission_forms')->where('form_id', $form->id)->delete();
+
+        // Créer la nouvelle liaison si le formulaire a une mission
+        if ($form->mission_id) {
+            DB::table('mission_forms')->insert([
+                'id'         => (string) Str::uuid(),
+                'mission_id' => $form->mission_id,
+                'form_id'    => $form->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    /**
      * GET /forms
      */
     public function index(Request $request)
@@ -164,6 +185,9 @@ class FormController extends Controller
                 'user_id'     => $request->user()->id,
             ]);
 
+            // ✅ Lier le formulaire à la mission via la table pivot mission_forms
+            $this->syncMissionForm($form);
+
             foreach ($request->input('sections', []) as $sIndex => $sectionData) {
                 $section = Section::create([
                     'id'      => (string) Str::uuid(),
@@ -221,6 +245,9 @@ class FormController extends Controller
         DB::transaction(function () use ($request, $form) {
             $form->update($request->only(['titre', 'description', 'mission_id', 'est_modele']));
 
+            // ✅ Mettre à jour la liaison mission_forms si mission_id a changé
+            $this->syncMissionForm($form);
+
             if ($request->has('sections')) {
                 // Supprimer anciennes sections + questions et recréer
                 $form->sections()->each(function ($s) {
@@ -276,6 +303,9 @@ class FormController extends Controller
         }
 
         $form->update(['statut' => 'publie']);
+
+        // ✅ S'assurer que la liaison mission_forms existe au moment de la publication
+        $this->syncMissionForm($form);
 
         return response()->json([
             'success' => true,
@@ -364,6 +394,9 @@ class FormController extends Controller
         }
 
         DB::transaction(function () use ($form) {
+            // ✅ Nettoyer la liaison mission_forms avant suppression
+            DB::table('mission_forms')->where('form_id', $form->id)->delete();
+
             $form->sections()->each(function ($s) {
                 $s->questions()->delete();
                 $s->delete();

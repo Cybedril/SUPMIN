@@ -22,10 +22,10 @@ Route::get('/dashboard', [DashboardController::class, 'index']);
 
 /*
 |--------------------------------------------------------------------------
-| USERS — Admin uniquement
+| USERS — Admin + Coordinateur (le coordinateur a besoin de lister les agents)
 |--------------------------------------------------------------------------
 */
-Route::prefix('users')->middleware('role:admin')->group(function () {
+Route::prefix('users')->middleware('role:admin|coordinateur')->group(function () {
     Route::get('/', [UserController::class, 'index']);
     Route::post('/', [UserController::class, 'store']);
     Route::get('/{user}', [UserController::class, 'show']);
@@ -78,7 +78,7 @@ Route::prefix('missions')->group(function () {
 });
 
 Route::get('/my-missions', function (\Illuminate\Http\Request $request) {
-    $missions = $request->user()->assignedMissions()->with('entity')->get();
+    $missions = $request->user()->assignedMissions()->with(['entity', 'forms'])->get();
     return response()->json(['success' => true, 'data' => $missions, 'errors' => null]);
 });
 
@@ -140,6 +140,8 @@ Route::prefix('reports')->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::post('/responses', [ResponseController::class, 'store']);
+Route::get('/responses', [ResponseController::class, 'index']);
+Route::post('/responses/submit', [ResponseController::class, 'submit']);   // ← AJOUTER
 Route::post('/responses/sync', [ResponseSyncController::class, 'sync']);
 
 /*
@@ -160,4 +162,3 @@ Route::prefix('notifications')->group(function () {
     Route::patch('/read-all', [NotificationController::class, 'markAllRead']);
     Route::delete('/{id}', [NotificationController::class, 'destroy']);
 });
-

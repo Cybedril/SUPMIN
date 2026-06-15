@@ -19,7 +19,7 @@ class MissionController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Mission::with(['entity', 'coordinateur', 'agents']);
+        $query = Mission::with(['entity', 'coordinateur', 'agents', 'forms']);
 
         if ($request->has('statut')) {
             $query->where('statut', $request->statut);
@@ -86,12 +86,11 @@ class MissionController extends Controller
 
     /**
      * PATCH /missions/{id}/validate
-     * RG-MIS-001 : Validation par coordinateur
-     * RG-MIS-003 : Au moins un formulaire associé
+     * RG-MIS-001 + RG-MIS-003 : valider la mission (passe de planifiee → en_cours)
      */
-    public function validateMission(Mission $mission)
+    public function validateMission(Request $request, Mission $mission)
     {
-        if ($mission->statut !== 'planifiée') {
+        if ($mission->statut !== 'planifiee') {
             return response()->json([
                 'success' => false,
                 'message' => 'Seule une mission planifiée peut être validée',
@@ -99,12 +98,13 @@ class MissionController extends Controller
             ], 422);
         }
 
-        // RG-MIS-003 : vérifier qu'au moins un formulaire est associé
-        if ($mission->forms()->count() === 0) {
+        // RG-MIS-003 : vérifier qu'au moins un formulaire publié est associé
+        $formsCount = $mission->forms()->where('statut', 'publie')->count();
+        if ($formsCount === 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'Impossible de valider : aucun formulaire n\'est associé à cette mission (RG-MIS-003)',
-                'errors'  => ['forms' => 'Au moins un formulaire doit être créé et associé à la mission']
+                'message' => 'Impossible de valider : aucun formulaire publié n\'est associé à cette mission (RG-MIS-003)',
+                'errors'  => ['forms' => 'Au moins un formulaire publié doit être associé à la mission']
             ], 422);
         }
 
@@ -143,8 +143,9 @@ class MissionController extends Controller
             ], 422);
         }
 
+        // ✅ FIX : utiliser "cloturee" (sans accent) pour rester cohérent avec validateStatusTransition
         $mission->update([
-            'statut'             => 'clôturée',
+            'statut'             => 'cloturee',
             'date_fin_effective' => now(),
         ]);
 
@@ -173,37 +174,29 @@ class MissionController extends Controller
 
         $unresolved = Recommendation::whereHas('mission', function ($q) use ($entityId, $mission) {
             $q->where('entity_id', $entityId)
-              ->where('id', '!=', $mission->id)
-              ->where('statut', 'clôturée');
+              ->where('id', '!=', $mission->id);
         })
-        ->whereNotIn('statut', ['clôturée', 'non_mise_en_oeuvre'])
-        ->with(['mission', 'responsable'])
+        ->whereNotIn('statut', ['cloturee', 'realisee'])
+        ->with('mission')
         ->get();
 
         return response()->json([
             'success' => true,
             'data'    => $unresolved,
-            'message' => 'Recommandations non clôturées des missions précédentes',
+            'message' => 'Recommandations non résolues',
             'errors'  => null
         ]);
     }
 
     /**
-     * GET /missions/{id}/pdf
+     * GET /missions/{id}/pdf - placeholder
      */
     public function pdf(Mission $mission)
     {
-        if (!$mission->pdf_path) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Aucun PDF disponible'
-            ], 404);
-        }
-
         return response()->json([
             'success' => true,
-            'data'    => ['url' => asset('storage/' . $mission->pdf_path)],
-            'message' => 'PDF disponible',
+            'data'    => null,
+            'message' => 'Génération PDF',
             'errors'  => null
         ]);
     }

@@ -25,7 +25,6 @@ class AuthController extends Controller
         $request->validate([
             'email'    => 'required|email',
             'password' => 'required',
-            'role'     => 'required|string',
         ]);
 
         $user = User::where('email', $request->email)->first();
@@ -36,15 +35,6 @@ class AuthController extends Controller
                 'message' => 'Identifiants invalides',
                 'errors'  => null
             ], 401);
-        }
-
-        $userRole = $user->roles->first();
-        if (!$userRole || $userRole->libelle !== $request->role) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Le rôle sélectionné ne correspond pas à votre compte.',
-                'errors'  => null
-            ], 403);
         }
 
         if ($user->compte_bloque) {
@@ -146,6 +136,7 @@ class AuthController extends Controller
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
+        $userRole = $user->roles->first();
 
         return response()->json([
             'success' => true,
@@ -158,8 +149,8 @@ class AuthController extends Controller
                 'statut'    => $user->statut,
                 'telephone' => $user->telephone,
                 'entity_id' => $user->entity_id,
-                'role'      => $userRole->libelle,
-                'role_code' => $userRole->name,
+                'role'      => $userRole ? $userRole->libelle : null,
+                'role_code' => $userRole ? $userRole->name : null,
             ],
             'message' => 'Connexion réussie',
             'errors'  => null
@@ -334,22 +325,23 @@ class AuthController extends Controller
             'errors'  => null,
         ]);
     }
+
     public function updateProfile(Request $request)
     {
         $user = $request->user();
-    
+
         $request->validate([
             'nom'       => 'sometimes|string|max:100',
             'prenom'    => 'sometimes|string|max:100',
             'telephone' => 'sometimes|nullable|string|max:20',
             'email'     => 'sometimes|email|unique:users,email,' . $user->id,
         ]);
-    
+
         $user->update($request->only(['nom', 'prenom', 'telephone', 'email']));
-    
+
         $user->load(['roles', 'entity']);
         $role = $user->roles->first();
-    
+
         return response()->json([
             'success' => true,
             'data'    => [
@@ -368,7 +360,6 @@ class AuthController extends Controller
             'errors'  => null,
         ]);
     }
-    
 
     public function changePassword(Request $request)
     {
@@ -377,9 +368,9 @@ class AuthController extends Controller
             'new_password'          => 'required|string|min:8|confirmed',
             'new_password_confirmation' => 'required',
         ]);
-    
+
         $user = $request->user();
-    
+
         if (!Hash::check($request->current_password, $user->mot_de_passe_hash)) {
             return response()->json([
                 'success' => false,
@@ -387,11 +378,11 @@ class AuthController extends Controller
                 'errors'  => null,
             ], 401);
         }
-    
+
         $user->update([
             'mot_de_passe_hash' => Hash::make($request->new_password),
         ]);
-    
+
         return response()->json([
             'success' => true,
             'data'    => null,

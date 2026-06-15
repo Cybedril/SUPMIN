@@ -38,12 +38,12 @@ Route::prefix('missions')->group(function () {
     Route::get('/{id}/report', [ReportController::class, 'buildFromMission']);
 });
 
-// Mes missions (agent)
+// Mes missions (agent) - inclut les formulaires associés pour la page Collecte
 Route::get('/my-missions', function (Request $request) {
 
     $missions = $request->user()
         ->assignedMissions()
-        ->with('entity')
+        ->with(['entity', 'forms'])  // ← AJOUT de 'forms' pour que l'agent voie les formulaires de sa mission
         ->get();
 
     return response()->json([

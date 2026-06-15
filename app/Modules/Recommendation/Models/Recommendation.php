@@ -9,6 +9,8 @@ class Recommendation extends Model
 {
     use HasUuid;
 
+    protected $table = 'recommandations';
+
     protected $fillable = [
         'id',
         'mission_id',
