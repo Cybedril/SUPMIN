@@ -30,6 +30,8 @@ class RecommendationTracking extends Model
     public $incrementing = false;
     protected $keyType = 'string';
 
+    public $timestamps = false;
+
     public function recommendation()
     {
         return $this->belongsTo(
@@ -39,6 +41,14 @@ class RecommendationTracking extends Model
     }
 
     public function user()
+    {
+        return $this->belongsTo(
+            \App\Models\User::class,
+            'updated_by'
+        );
+    }
+
+    public function updatedBy()
     {
         return $this->belongsTo(
             \App\Models\User::class,

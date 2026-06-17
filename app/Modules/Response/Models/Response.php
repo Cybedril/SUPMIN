@@ -13,6 +13,7 @@ class Response extends Model
         'id',
         'question_id',
         'mission_id',
+        'formulaire_id',     
         'agent_id',
         'valeur_texte',
         'valeur_json',
@@ -43,6 +44,19 @@ class Response extends Model
     {
         return $this->belongsTo(
             \App\Modules\Mission\Models\Mission::class
+        );
+    }
+
+    /**
+     * Le formulaire auquel appartient cette réponse.
+     * Lien direct ajouté pour faciliter les requêtes
+     * (sans avoir à passer par question -> section -> formulaire).
+     */
+    public function formulaire()
+    {
+        return $this->belongsTo(
+            \App\Modules\Form\Models\Form::class,
+            'formulaire_id'
         );
     }
 

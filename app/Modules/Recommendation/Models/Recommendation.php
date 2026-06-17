@@ -9,6 +9,8 @@ class Recommendation extends Model
 {
     use HasUuid;
 
+    protected $table = 'recommandations';
+
     protected $fillable = [
         'id',
         'mission_id',
@@ -65,5 +67,15 @@ class Recommendation extends Model
             self::class,
             'recommandation_parente_id'
         );
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'creee_par');
+    }
+
+    public function validatedBy()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'validee_par');
     }
 }

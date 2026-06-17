@@ -9,6 +9,9 @@ use App\Modules\Mission\Services\MissionService;
 use App\Modules\Mission\Requests\CreateMissionRequest;
 use App\Modules\Mission\Requests\UpdateMissionRequest;
 use App\Modules\Recommendation\Models\Recommendation;
+use App\Notifications\MissionCreatedNotification;
+use App\Notifications\MissionValidatedNotification;
+use Illuminate\Support\Facades\Notification;
 
 class MissionController extends Controller
 {
@@ -19,7 +22,7 @@ class MissionController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Mission::with(['entity', 'coordinateur', 'agents']);
+        $query = Mission::with(['entity', 'coordinateur', 'agents', 'forms']);
 
         if ($request->has('statut')) {
             $query->where('statut', $request->statut);
@@ -56,10 +59,17 @@ class MissionController extends Controller
 
     /**
      * POST /missions
+     * Notifie les agents affectés (RG-NOT)
      */
     public function store(CreateMissionRequest $request)
     {
         $mission = $this->service->create($request->validated(), $request->user());
+
+        // ✅ Notifier tous les agents affectés à la mission
+        $agents = $mission->agents()->get();
+        if ($agents->count() > 0) {
+            Notification::send($agents, new MissionCreatedNotification($mission));
+        }
 
         return response()->json([
             'success' => true,
@@ -86,12 +96,11 @@ class MissionController extends Controller
 
     /**
      * PATCH /missions/{id}/validate
-     * RG-MIS-001 : Validation par coordinateur
-     * RG-MIS-003 : Au moins un formulaire associé
+     * RG-MIS-001 + RG-MIS-003 : valider la mission (planifiee → en_cours)
      */
-    public function validateMission(Mission $mission)
+    public function validateMission(Request $request, Mission $mission)
     {
-        if ($mission->statut !== 'planifiée') {
+        if ($mission->statut !== 'planifiee') {
             return response()->json([
                 'success' => false,
                 'message' => 'Seule une mission planifiée peut être validée',
@@ -99,12 +108,13 @@ class MissionController extends Controller
             ], 422);
         }
 
-        // RG-MIS-003 : vérifier qu'au moins un formulaire est associé
-        if ($mission->forms()->count() === 0) {
+        // RG-MIS-003 : vérifier qu'au moins un formulaire publié est associé
+        $formsCount = $mission->forms()->where('statut', 'publie')->count();
+        if ($formsCount === 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'Impossible de valider : aucun formulaire n\'est associé à cette mission (RG-MIS-003)',
-                'errors'  => ['forms' => 'Au moins un formulaire doit être créé et associé à la mission']
+                'message' => 'Impossible de valider : aucun formulaire publié n\'est associé à cette mission (RG-MIS-003)',
+                'errors'  => ['forms' => 'Au moins un formulaire publié doit être associé à la mission']
             ], 422);
         }
 
@@ -117,6 +127,12 @@ class MissionController extends Controller
             'user_id'     => auth()->id(),
         ]);
 
+        // ✅ Notifier les agents que la mission démarre
+        $agents = $mission->agents()->get();
+        if ($agents->count() > 0) {
+            Notification::send($agents, new MissionValidatedNotification($mission));
+        }
+
         return response()->json([
             'success' => true,
             'data'    => $mission->fresh(),
@@ -127,7 +143,7 @@ class MissionController extends Controller
 
     /**
      * PATCH /missions/{id}/close
-     * RG-MIS-005 : Clôture de mission
+     * RG-MIS-005
      */
     public function close(Request $request, Mission $mission)
     {
@@ -144,11 +160,10 @@ class MissionController extends Controller
         }
 
         $mission->update([
-            'statut'             => 'clôturée',
+            'statut'             => 'cloturee',
             'date_fin_effective' => now(),
         ]);
 
-        // Log
         $mission->logs()->create([
             'action'      => 'closed',
             'description' => $request->commentaire ?? 'Mission clôturée',
@@ -165,7 +180,7 @@ class MissionController extends Controller
 
     /**
      * GET /missions/{id}/unresolved-recommendations
-     * RG-REC-004 : Recommandations non clôturées des missions précédentes
+     * RG-REC-004
      */
     public function unresolvedRecommendations(Mission $mission)
     {
@@ -173,37 +188,26 @@ class MissionController extends Controller
 
         $unresolved = Recommendation::whereHas('mission', function ($q) use ($entityId, $mission) {
             $q->where('entity_id', $entityId)
-              ->where('id', '!=', $mission->id)
-              ->where('statut', 'clôturée');
+              ->where('id', '!=', $mission->id);
         })
-        ->whereNotIn('statut', ['clôturée', 'non_mise_en_oeuvre'])
-        ->with(['mission', 'responsable'])
+        ->whereNotIn('statut', ['cloturee', 'mise_en_oeuvre'])
+        ->with('mission')
         ->get();
 
         return response()->json([
             'success' => true,
             'data'    => $unresolved,
-            'message' => 'Recommandations non clôturées des missions précédentes',
+            'message' => 'Recommandations non résolues',
             'errors'  => null
         ]);
     }
 
-    /**
-     * GET /missions/{id}/pdf
-     */
     public function pdf(Mission $mission)
     {
-        if (!$mission->pdf_path) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Aucun PDF disponible'
-            ], 404);
-        }
-
         return response()->json([
             'success' => true,
-            'data'    => ['url' => asset('storage/' . $mission->pdf_path)],
-            'message' => 'PDF disponible',
+            'data'    => null,
+            'message' => 'Génération PDF',
             'errors'  => null
         ]);
     }

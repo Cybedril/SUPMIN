@@ -11,8 +11,7 @@ use App\Modules\Report\Controllers\ReportController;
 use App\Modules\Notification\Controllers\NotificationController;
 use App\Modules\Response\Controllers\ResponseController;
 use App\Http\Controllers\ResponseSyncController;
-use App\Modules\Dashboard\Controllers\DashboardController;
-use App\Modules\Auth\Controllers\AuthController;
+use App\Modules\Dashboard\Controllers\DashboardController; 
 
 /*
 |--------------------------------------------------------------------------
@@ -23,10 +22,10 @@ Route::get('/dashboard', [DashboardController::class, 'index']);
 
 /*
 |--------------------------------------------------------------------------
-| USERS — Admin uniquement
+| USERS — Admin + Coordinateur (le coordinateur a besoin de lister les agents)
 |--------------------------------------------------------------------------
 */
-Route::prefix('users')->middleware('role:admin')->group(function () {
+Route::prefix('users')->middleware('role:admin|coordinateur')->group(function () {
     Route::get('/', [UserController::class, 'index']);
     Route::post('/', [UserController::class, 'store']);
     Route::get('/{user}', [UserController::class, 'show']);
@@ -34,7 +33,6 @@ Route::prefix('users')->middleware('role:admin')->group(function () {
     Route::delete('/{user}', [UserController::class, 'destroy']);
     Route::patch('/{user}/suspend', [UserController::class, 'suspend']);
     Route::patch('/{user}/activate', [UserController::class, 'activate']);
-    Route::post('/register', [AuthController::class, 'register']);
     Route::post('/check-inactive', [UserController::class, 'checkInactive']);
 
     // === Routes activation compte ===
@@ -80,7 +78,7 @@ Route::prefix('missions')->group(function () {
 });
 
 Route::get('/my-missions', function (\Illuminate\Http\Request $request) {
-    $missions = $request->user()->assignedMissions()->with('entity')->get();
+    $missions = $request->user()->assignedMissions()->with(['entity', 'forms'])->get();
     return response()->json(['success' => true, 'data' => $missions, 'errors' => null]);
 });
 
@@ -128,7 +126,7 @@ Route::prefix('recommendations')->group(function () {
 Route::prefix('reports')->group(function () {
     Route::get('/', [ReportController::class, 'index']);
     Route::get('/{id}', [ReportController::class, 'show']);
-    Route::patch('/{id}/validate', [ReportController::class, 'validate'])
+    Route::patch('/{id}/validate', [ReportController::class, 'validateReport'])
         ->middleware('role:admin|coordinateur');
     Route::patch('/{id}/transmit', [ReportController::class, 'transmit'])
         ->middleware('role:admin|coordinateur');
@@ -142,6 +140,8 @@ Route::prefix('reports')->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::post('/responses', [ResponseController::class, 'store']);
+Route::get('/responses', [ResponseController::class, 'index']);
+Route::post('/responses/submit', [ResponseController::class, 'submit']);   // ← AJOUTER
 Route::post('/responses/sync', [ResponseSyncController::class, 'sync']);
 
 /*
@@ -162,4 +162,3 @@ Route::prefix('notifications')->group(function () {
     Route::patch('/read-all', [NotificationController::class, 'markAllRead']);
     Route::delete('/{id}', [NotificationController::class, 'destroy']);
 });
-

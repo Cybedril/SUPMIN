@@ -25,7 +25,6 @@ class AuthController extends Controller
         $request->validate([
             'email'    => 'required|email',
             'password' => 'required',
-            'role'     => 'required|string',
         ]);
 
         $user = User::where('email', $request->email)->first();
@@ -38,17 +37,6 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // Vérification du rôle sélectionné
-        $userRole = $user->roles->first();
-        if (!$userRole || $userRole->libelle !== $request->role) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Le rôle sélectionné ne correspond pas à votre compte.',
-                'errors'  => null
-            ], 403);
-        }
-
-        // Compte bloqué
         if ($user->compte_bloque) {
             return response()->json([
                 'success' => false,
@@ -57,7 +45,6 @@ class AuthController extends Controller
             ], 423);
         }
 
-        // Compte suspendu
         if ($user->statut === 'suspendu') {
             return response()->json([
                 'success' => false,
@@ -66,10 +53,8 @@ class AuthController extends Controller
             ], 403);
         }
 
-        // CAS 1 : Compte non encore activé (première connexion)
         if (!$user->compte_active) {
 
-            // ⚠️ Vérifier d'abord si le mdp d'activation est expiré
             if ($user->isActivationPasswordExpired()) {
                 return response()->json([
                     'success' => false,
@@ -78,9 +63,7 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            // Vérifier le mot de passe d'activation
             if (!Hash::check($request->password, $user->mot_de_passe_hash)) {
-                // Tentative échouée : régénérer + redonner 3 jours
                 $newMdp = $this->generateActivationPassword();
                 $newExpireAt = now()->addDays(self::ACTIVATION_VALIDITY_DAYS);
                 $newAttempts = $user->tentatives_activation + 1;
@@ -92,7 +75,6 @@ class AuthController extends Controller
                     'tentatives_activation'    => $newAttempts,
                 ]);
 
-                // 3 tentatives échouées : bloquer
                 if ($newAttempts >= self::MAX_ACTIVATION_ATTEMPTS) {
                     $user->update(['compte_bloque' => true]);
 
@@ -110,7 +92,6 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            // Mot de passe correct → token temporaire
             return response()->json([
                 'success'     => true,
                 'first_login' => true,
@@ -121,7 +102,6 @@ class AuthController extends Controller
             ]);
         }
 
-        // CAS 2 : Compte activé
         if ($user->tentatives_echec >= self::MAX_ATTEMPTS) {
             $lockedUntil = $user->updated_at->addMinutes(self::LOCK_MINUTES);
             if (now()->lt($lockedUntil)) {
@@ -156,6 +136,7 @@ class AuthController extends Controller
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
+        $userRole = $user->roles->first();
 
         return response()->json([
             'success' => true,
@@ -168,8 +149,8 @@ class AuthController extends Controller
                 'statut'    => $user->statut,
                 'telephone' => $user->telephone,
                 'entity_id' => $user->entity_id,
-                'role'      => $userRole->libelle,
-                'role_code' => $userRole->name,
+                'role'      => $userRole ? $userRole->libelle : null,
+                'role_code' => $userRole ? $userRole->name : null,
             ],
             'message' => 'Connexion réussie',
             'errors'  => null
@@ -255,6 +236,158 @@ class AuthController extends Controller
             ],
             'message' => 'Utilisateur authentifié',
             'errors'  => null
+        ]);
+    }
+
+    public function forgotPassword(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:users,email',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aucun utilisateur trouvé avec cet email.',
+                'errors'  => null,
+            ], 404);
+        }
+
+        if ($user->compte_bloque) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Votre compte est bloqué. Contactez l\'administrateur.',
+                'errors'  => null,
+            ], 403);
+        }
+
+        $newActivationPassword = $this->generateActivationPassword();
+
+        $user->update([
+            'mdp_activation'           => Hash::make($newActivationPassword),
+            'mdp_activation_expire_at' => now()->addDays(self::ACTIVATION_VALIDITY_DAYS),
+            'compte_active'            => false,
+            'tentatives_activation'    => 0,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'message'            => 'Un mot de passe temporaire vous a été envoyé par email.',
+                'temporary_password' => $newActivationPassword,
+            ],
+            'message' => 'Mot de passe temporaire généré et valide pendant 3 jours.',
+            'errors'  => null,
+        ]);
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'email'                    => 'required|email|exists:users,email',
+            'temporary_password'       => 'required|string',
+            'new_password'             => 'required|string|min:8|confirmed',
+            'new_password_confirmation' => 'required',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || !Hash::check($request->temporary_password, $user->mdp_activation)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Mot de passe temporaire incorrect.',
+                'errors'  => null,
+            ], 401);
+        }
+
+        if ($user->isActivationPasswordExpired()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Le mot de passe temporaire a expiré. Demandez-en un nouveau.',
+                'errors'  => null,
+            ], 401);
+        }
+
+        $user->update([
+            'mot_de_passe_hash'        => Hash::make($request->new_password),
+            'compte_active'            => true,
+            'mdp_activation'           => null,
+            'mdp_activation_expire_at' => null,
+            'tentatives_activation'    => 0,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => null,
+            'message' => 'Mot de passe réinitialisé avec succès. Vous pouvez vous connecter.',
+            'errors'  => null,
+        ]);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'nom'       => 'sometimes|string|max:100',
+            'prenom'    => 'sometimes|string|max:100',
+            'telephone' => 'sometimes|nullable|string|max:20',
+            'email'     => 'sometimes|email|unique:users,email,' . $user->id,
+        ]);
+
+        $user->update($request->only(['nom', 'prenom', 'telephone', 'email']));
+
+        $user->load(['roles', 'entity']);
+        $role = $user->roles->first();
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'id'        => $user->id,
+                'nom'       => $user->nom,
+                'prenom'    => $user->prenom,
+                'email'     => $user->email,
+                'telephone' => $user->telephone,
+                'statut'    => $user->statut,
+                'entity_id' => $user->entity_id,
+                'entite'    => $user->entity ? $user->entity->denomination : null,
+                'role'      => $role ? $role->libelle : null,
+                'role_code' => $role ? $role->name : null,
+            ],
+            'message' => 'Profil mis à jour avec succès.',
+            'errors'  => null,
+        ]);
+    }
+
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'current_password'      => 'required|string',
+            'new_password'          => 'required|string|min:8|confirmed',
+            'new_password_confirmation' => 'required',
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_password, $user->mot_de_passe_hash)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Le mot de passe actuel est incorrect.',
+                'errors'  => null,
+            ], 401);
+        }
+
+        $user->update([
+            'mot_de_passe_hash' => Hash::make($request->new_password),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => null,
+            'message' => 'Mot de passe modifié avec succès.',
+            'errors'  => null,
         ]);
     }
 }
