@@ -68,4 +68,14 @@ class Recommendation extends Model
             'recommandation_parente_id'
         );
     }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'creee_par');
+    }
+
+    public function validatedBy()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'validee_par');
+    }
 }

@@ -126,7 +126,7 @@ Route::prefix('recommendations')->group(function () {
 Route::prefix('reports')->group(function () {
     Route::get('/', [ReportController::class, 'index']);
     Route::get('/{id}', [ReportController::class, 'show']);
-    Route::patch('/{id}/validate', [ReportController::class, 'validate'])
+    Route::patch('/{id}/validate', [ReportController::class, 'validateReport'])
         ->middleware('role:admin|coordinateur');
     Route::patch('/{id}/transmit', [ReportController::class, 'transmit'])
         ->middleware('role:admin|coordinateur');

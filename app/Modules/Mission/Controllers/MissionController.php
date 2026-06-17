@@ -9,6 +9,9 @@ use App\Modules\Mission\Services\MissionService;
 use App\Modules\Mission\Requests\CreateMissionRequest;
 use App\Modules\Mission\Requests\UpdateMissionRequest;
 use App\Modules\Recommendation\Models\Recommendation;
+use App\Notifications\MissionCreatedNotification;
+use App\Notifications\MissionValidatedNotification;
+use Illuminate\Support\Facades\Notification;
 
 class MissionController extends Controller
 {
@@ -56,10 +59,17 @@ class MissionController extends Controller
 
     /**
      * POST /missions
+     * Notifie les agents affectés (RG-NOT)
      */
     public function store(CreateMissionRequest $request)
     {
         $mission = $this->service->create($request->validated(), $request->user());
+
+        // ✅ Notifier tous les agents affectés à la mission
+        $agents = $mission->agents()->get();
+        if ($agents->count() > 0) {
+            Notification::send($agents, new MissionCreatedNotification($mission));
+        }
 
         return response()->json([
             'success' => true,
@@ -86,7 +96,7 @@ class MissionController extends Controller
 
     /**
      * PATCH /missions/{id}/validate
-     * RG-MIS-001 + RG-MIS-003 : valider la mission (passe de planifiee → en_cours)
+     * RG-MIS-001 + RG-MIS-003 : valider la mission (planifiee → en_cours)
      */
     public function validateMission(Request $request, Mission $mission)
     {
@@ -117,6 +127,12 @@ class MissionController extends Controller
             'user_id'     => auth()->id(),
         ]);
 
+        // ✅ Notifier les agents que la mission démarre
+        $agents = $mission->agents()->get();
+        if ($agents->count() > 0) {
+            Notification::send($agents, new MissionValidatedNotification($mission));
+        }
+
         return response()->json([
             'success' => true,
             'data'    => $mission->fresh(),
@@ -127,7 +143,7 @@ class MissionController extends Controller
 
     /**
      * PATCH /missions/{id}/close
-     * RG-MIS-005 : Clôture de mission
+     * RG-MIS-005
      */
     public function close(Request $request, Mission $mission)
     {
@@ -143,13 +159,11 @@ class MissionController extends Controller
             ], 422);
         }
 
-        // ✅ FIX : utiliser "cloturee" (sans accent) pour rester cohérent avec validateStatusTransition
         $mission->update([
             'statut'             => 'cloturee',
             'date_fin_effective' => now(),
         ]);
 
-        // Log
         $mission->logs()->create([
             'action'      => 'closed',
             'description' => $request->commentaire ?? 'Mission clôturée',
@@ -166,7 +180,7 @@ class MissionController extends Controller
 
     /**
      * GET /missions/{id}/unresolved-recommendations
-     * RG-REC-004 : Recommandations non clôturées des missions précédentes
+     * RG-REC-004
      */
     public function unresolvedRecommendations(Mission $mission)
     {
@@ -176,7 +190,7 @@ class MissionController extends Controller
             $q->where('entity_id', $entityId)
               ->where('id', '!=', $mission->id);
         })
-        ->whereNotIn('statut', ['cloturee', 'realisee'])
+        ->whereNotIn('statut', ['cloturee', 'mise_en_oeuvre'])
         ->with('mission')
         ->get();
 
@@ -188,9 +202,6 @@ class MissionController extends Controller
         ]);
     }
 
-    /**
-     * GET /missions/{id}/pdf - placeholder
-     */
     public function pdf(Mission $mission)
     {
         return response()->json([

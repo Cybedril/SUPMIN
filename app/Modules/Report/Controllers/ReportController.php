@@ -5,13 +5,11 @@ namespace App\Modules\Report\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use App\Modules\Report\Services\ReportService;
 use App\Modules\Report\Services\ReportBuilderService;
 
 class ReportController extends Controller
 {
     public function __construct(
-        private ReportService $service,
         private ReportBuilderService $builder
     ) {}
 
@@ -83,7 +81,7 @@ class ReportController extends Controller
      * PATCH /reports/{id}/validate — Validation du rapport (RG-RAP-002)
      * Coordinateur valide le rapport
      */
-    public function validate(Request $request, $id)
+    public function validateReport(Request $request, $id)
     {
         $report = \App\Modules\Report\Models\Report::findOrFail($id);
 

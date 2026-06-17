@@ -4,8 +4,7 @@ namespace App\Modules\Notification\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
-use Illuminate\Notifications\DatabaseNotification;
+use Carbon\Carbon;
 
 class NotificationController extends Controller
 {
@@ -14,19 +13,23 @@ class NotificationController extends Controller
      */
     public function index(Request $request)
     {
+        // Forcer la locale française pour diffForHumans()
+        Carbon::setLocale('fr');
+
         $notifications = $request->user()
             ->notifications()
             ->latest()
             ->get()
             ->map(function ($n) {
                 return [
-                    'id'      => $n->id,
-                    'type'    => $n->data['type'] ?? 'systeme',
-                    'titre'   => $n->data['titre'] ?? '',
-                    'message' => $n->data['message'] ?? '',
-                    'lu'      => !is_null($n->read_at),
-                    'temps'   => $n->created_at->diffForHumans(),
+                    'id'         => $n->id,
+                    'type'       => $n->data['type'] ?? 'systeme',
+                    'titre'      => $n->data['titre'] ?? 'Notification',
+                    'message'    => $n->data['message'] ?? '',
+                    'lu'         => !is_null($n->read_at),
+                    'temps'      => $n->created_at->diffForHumans(),
                     'created_at' => $n->created_at,
+                    'data'       => $n->data,
                 ];
             });
 
@@ -40,7 +43,7 @@ class NotificationController extends Controller
     }
 
     /**
-     * PATCH /notifications/{id}/read — Marquer une notification comme lue
+     * PATCH /notifications/{id}/read
      */
     public function markRead($id)
     {
@@ -56,7 +59,7 @@ class NotificationController extends Controller
     }
 
     /**
-     * PATCH /notifications/read-all — Marquer toutes comme lues
+     * PATCH /notifications/read-all
      */
     public function markAllRead(Request $request)
     {
@@ -71,7 +74,7 @@ class NotificationController extends Controller
     }
 
     /**
-     * DELETE /notifications/{id} — Supprimer une notification
+     * DELETE /notifications/{id}
      */
     public function destroy($id)
     {
